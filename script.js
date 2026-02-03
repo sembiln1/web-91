@@ -27,7 +27,6 @@ function createRain() {
         container.appendChild(drop);
     }
 }
-window.onload = createRain;
 
 // 3. DATABASE USER
 const dataUsers = [
@@ -47,7 +46,7 @@ const dataUsers = [
     { user: "user25", pass: "pass25" }
 ];
 
-// 4. LOGIKA LOGIN (DENGAN PERBAIKAN DISCONNECT)
+// 4. LOGIKA LOGIN (ANTI-NYANGKUT + LAPOR 5 DETIK)
 document.getElementById('loginForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     const user = document.getElementById('username').value;
@@ -63,19 +62,23 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
 
         currentUserSession = user;
         const waktu = new Date().toLocaleString('id-ID', { hour: '2-digit', minute: '2-digit' });
-        
-        // REVISI: Simpan ke localStorage buat dipake di page91
         localStorage.setItem('savedUser', user);
         
         const userLogRef = database.ref('log_online/' + user);
-        userLogRef.set({ username: user, jam: waktu });
+        
+        // Simpan data dengan Timestamp Server (Buat deteksi online real)
+        userLogRef.set({ 
+            username: user, 
+            jam: waktu,
+            last_seen: firebase.database.ServerValue.TIMESTAMP 
+        });
 
-        // LOGIKA SAKTI: Hanya hapus jika koneksi benar-benar putus (tutup browser)
         userLogRef.onDisconnect().remove();
 
         if (user === "admin") {
             alert('Mode Owner Aktif!');
-            tampilkanLogAdmin();
+            tampilkanLogAdmin(); 
+            mulaiPembersihOtomatis(); // Aktifkan sapu buat admin
         } else {
             alert('Login Berhasil!');
             window.location.href = "page91.html";
@@ -85,18 +88,10 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
     }
 });
 
-// 5. FUNGSI HAPUS RIWAYAT (PERBAIKAN)
+// 5. FUNGSI HAPUS RIWAYAT
 window.hapusLogServer = function() {
     if(confirm("Hapus semua riwayat login di server?")) {
-        database.ref('log_online').remove()
-        .then(() => {
-            alert("Log Berhasil Dibersihkan!");
-            const list = document.getElementById('onlineList');
-            if (list) list.innerHTML = "<li>Riwayat kosong.</li>";
-        })
-        .catch((error) => {
-            alert("Gagal menghapus: " + error.message);
-        });
+        database.ref('log_online').remove().then(() => alert("Log Bersih!"));
     }
 };
 
@@ -106,64 +101,81 @@ window.banUser = function(target) {
     if (confirm("Ban " + target + "?")) {
         database.ref('status_user/' + target).set("banned");
         database.ref('log_online/' + target).remove();
-        alert(target + " berhasil diban!");
     }
 };
 
 window.bukaBlokir = function(target) {
     database.ref('status_user/' + target).remove();
-    alert("Akses " + target + " dipulihkan.");
+    alert("Akses dipulihkan.");
 };
 
-// 7. TAMPILAN LOG ADMIN
+// 7. TAMPILAN LOG ADMIN (REALTIME + SAPU OTOMATIS)
 function tampilkanLogAdmin() {
     const list = document.getElementById('onlineList');
     const panel = document.getElementById('adminPanel');
     if (panel) panel.style.display = 'block';
 
-    database.ref('log_online').on('value', (snapshot) => {
-        const logs = snapshot.val();
+    database.ref().on('value', (snapshot) => {
+        const data = snapshot.val() || {};
+        const onlineLogs = data.log_online || {};
+        const bannedUsers = data.status_user || {};
+        
         if (list) {
             list.innerHTML = ""; 
-            if (logs) {
-                Object.values(logs).reverse().forEach(data => {
-                    const li = document.createElement('li');
-                    li.style.cssText = "padding:10px 0; border-bottom:1px solid #333; font-size:12px;";
-                    li.innerHTML = `
-                        🟢 <b>${data.username}</b> <span style="color:#888;">(${data.jam})</span>
-                        <div style="margin-top:5px;">
-                            <button onclick="banUser('${data.username}')" style="background:red; color:white; border:none; padding:2px 5px; border-radius:3px; cursor:pointer;">BAN</button>
-                            <button onclick="bukaBlokir('${data.username}')" style="background:green; color:white; border:none; padding:2px 5px; border-radius:3px; cursor:pointer; margin-left:5px;">UNBAN</button>
-                        </div>
-                    `;
-                    list.appendChild(li);
-                });
-            } else {
-                list.innerHTML = "<li>Tidak ada user online.</li>";
-            }
+
+            // DAFTAR BANNED
+            Object.keys(bannedUsers).forEach(username => {
+                const li = document.createElement('li');
+                li.style.cssText = "padding:10px 0; border-bottom:1px solid #ff4d4d; font-size:12px; color: #ff4d4d;";
+                li.innerHTML = `🚫 <b>${username}</b> [BAN] <button onclick="bukaBlokir('${username}')" style="float:right; background:green; color:white; border:none; border-radius:3px;">UNBAN</button>`;
+                list.appendChild(li);
+            });
+
+            // DAFTAR ONLINE
+            Object.values(onlineLogs).reverse().forEach(user => {
+                if (bannedUsers[user.username]) return;
+                const li = document.createElement('li');
+                li.style.cssText = "padding:10px 0; border-bottom:1px solid #333; font-size:12px;";
+                li.innerHTML = `🟢 <b>${user.username}</b> <span style="color:#888;">(${user.jam})</span> <button onclick="banUser('${user.username}')" style="float:right; background:red; color:white; border:none; border-radius:3px;">BAN</button>`;
+                list.appendChild(li);
+            });
+
+            if (list.innerHTML === "") list.innerHTML = "<li>Belum ada aktivitas...</li>";
         }
     });
 }
 
-// 8. AUTO CLEANUP SAAT KELUAR (REVISI: Matikan agar tidak hilang saat pindah halaman)
-/* window.addEventListener('beforeunload', () => {
-    if (currentUserSession && currentUserSession !== "admin") {
-        database.ref('log_online/' + currentUserSession).remove();
-    }
-}); */
+// FUNGSI SAPU OTOMATIS (Cek tiap 5 detik)
+function mulaiPembersihOtomatis() {
+    setInterval(() => {
+        const sekarang = Date.now();
+        database.ref('log_online').once('value', (snapshot) => {
+            snapshot.forEach((child) => {
+                const val = child.val();
+                // Jika user tidak update status > 10 detik, hapus dari list!
+                if (val.last_seen && sekarang - val.last_seen > 10000) {
+                    child.ref.remove();
+                }
+            });
+        });
+    }, 5000);
+}
+
+// 8. AUTO-RUN
+window.onload = function() {
+    createRain();
+    if (currentUserSession === "admin") tampilkanLogAdmin();
+};
 
 // 9. FUNGSI RIWAYAT KLIK TEKS 91
 window.bukaLogPribadi = function() {
     const userKita = currentUserSession || localStorage.getItem('savedUser');
     if (!userKita) return alert("Login dulu!");
-    
     database.ref('riwayat_pribadi/' + userKita).limitToLast(5).once('value', (snapshot) => {
         let text = `📜 Riwayat Login (${userKita}):\n\n`;
         if (snapshot.exists()) {
             snapshot.forEach(child => { text += `• ${child.val().waktu}\n`; });
             alert(text);
-        } else {
-            alert("Belum ada riwayat.");
-        }
+        } else { alert("Belum ada riwayat."); }
     });
 };

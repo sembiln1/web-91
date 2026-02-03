@@ -2,15 +2,21 @@
 <html>
 <head>
   <meta http-equiv="CONTENT-TYPE" content="text/html; charset=UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>91page</title>
+  
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
 </head>
 <body>
-  <h1>Testing To lol</h1>
+  <h1 onclick="bukaLogPribadi()" style="cursor:pointer; color: #00d2ff;">
+    9¹
+  </h1>
+  
+  <p>Testing To lol</p>
 
   <script>
-    // Konfigurasi Firebase lo (Copy dari script.js)
+    // 1. KONFIGURASI FIREBASE (Sesuai dengan index lo)
     const firebaseConfig = {
         apiKey: "AIzaSyDlucMVwMUbw7Ab3t2AVzI13EOHUrqDNZw",
         authDomain: "web-kelas-5b83a.firebaseapp.com",
@@ -19,20 +25,66 @@
         storageBucket: "web-kelas-5b83a.firebasestorage.app",
         messagingSenderId: "711947014423",
         appId: "1:711947014423:web:d8cb787c503d7d7538e752",
+        measurementId: "G-RYNNLZCGY5"
     };
+
     firebase.initializeApp(firebaseConfig);
+    const database = firebase.database();
 
+    // 2. LOGIKA LAPOR DIRI (Heartbeat 5 Detik & Anti-Undefined)
     const userAktif = localStorage.getItem('savedUser');
-    if (userAktif) {
-        const myLogRef = firebase.database().ref('log_online/' + userAktif);
-        const waktu = new Date().toLocaleString('id-ID', { hour: '2-digit', minute: '2-digit' });
 
-        // Update bahwa user sudah di dalam Page 91
-        myLogRef.update({ jam: waktu, status: "Aktif di Page 91" });
+    if (!userAktif || userAktif === "undefined") {
+        alert("Sesi habis, silakan login ulang!");
+        window.location.href = "index.html"; 
+    } else {
+        const userLogRef = database.ref('log_online/' + userAktif);
 
-        // TETEP PASANG INI: Kalau dia tutup browser di sini, data ilang di admin
-        myLogRef.onDisconnect().remove();
+        function kirimSinyalAktif() {
+            const waktu = new Date().toLocaleString('id-ID', { hour: '2-digit', minute: '2-digit' });
+            
+            userLogRef.update({
+                username: userAktif, 
+                jam: waktu,
+                last_seen: firebase.database.ServerValue.TIMESTAMP,
+                status: "Aktif di Page 91"
+            }).catch(err => console.error("Gagal lapor:", err));
+        }
+
+        // Jalankan laporan pertama kali
+        kirimSinyalAktif();
+        
+        // Hapus log kalau beneran tutup browser (onDisconnect)
+        userLogRef.onDisconnect().remove();
+
+        // INTERVAL LAPOR TIAP 5 DETIK
+        setInterval(kirimSinyalAktif, 5000);
+
+        // FITUR KICK/BAN REALTIME (Mental kalau di-ban admin)
+        database.ref('status_user/' + userAktif).on('value', (snapshot) => {
+            if (snapshot.exists() && snapshot.val() === "banned") {
+                alert("Akses Anda telah dicabut!");
+                localStorage.removeItem('savedUser');
+                window.location.href = "index.html";
+            }
+        });
     }
+
+    // 3. FUNGSI RIWAYAT PRIBADI
+    window.bukaLogPribadi = function() {
+        if (!userAktif) return alert("Login dulu!");
+        database.ref('riwayat_pribadi/' + userAktif).limitToLast(5).once('value', (snapshot) => {
+            let text = `📜 Riwayat Login (${userAktif}):\n\n`;
+            if (snapshot.exists()) {
+                snapshot.forEach(child => {
+                    text += `• ${child.val().waktu}\n`;
+                });
+                alert(text);
+            } else {
+                alert("Belum ada riwayat.");
+            }
+        });
+    };
   </script>
 </body>
 </html>
