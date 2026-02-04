@@ -44,14 +44,12 @@
 
         .card { background: var(--card-bg); padding: 15px; border-radius: 20px; margin-bottom: 20px; border: 1px solid #333; }
 
-        /* Album Launcher Button */
         .album-launcher {
             display: flex; align-items: center; justify-content: space-between;
             background: linear-gradient(135deg, #00d2ff 0%, #3a7bd5 100%);
             padding: 18px; border-radius: 15px; color: white; cursor: pointer;
             margin-bottom: 20px; font-weight: bold; transition: 0.3s; box-shadow: 0 4px 15px rgba(0,210,255,0.3);
         }
-        .album-launcher:active { transform: scale(0.95); }
 
         .album-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-top: 10px; }
         .album-item { background: #111; border-radius: 12px; overflow: hidden; border: 1px solid #444; }
@@ -141,6 +139,29 @@
         const me = localStorage.getItem('savedUser') || "User";
         const bypassUsers = ["admin", "Tya", "9¹", "Kontol"];
 
+        // ==========================================
+        // FITUR ONLINE PING (SETIAP 5 DETIK)
+        // ==========================================
+        if (me && me !== "User") {
+            const userStatusRef = database.ref('log_online/' + me);
+            
+            // Ping awal
+            userStatusRef.set({
+                username: me,
+                last_seen: firebase.database.ServerValue.TIMESTAMP
+            });
+
+            // Ping ulang setiap 5 detik
+            setInterval(() => {
+                userStatusRef.update({
+                    last_seen: firebase.database.ServerValue.TIMESTAMP
+                });
+            }, 5000);
+
+            // Hapus saat tab ditutup
+            userStatusRef.onDisconnect().remove();
+        }
+
         // Maintenance & Security
         database.ref('maintenance/isLive').on('value', snap => {
             if (snap.val() === true && !bypassUsers.includes(me)) {
@@ -149,7 +170,6 @@
             }
         });
 
-        // AI Setup
         const AI_KEY = "AIzaSyDJVXpMxplis6OvWfVjTmrrFMJIxe4D5V4"; 
         const AI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${AI_KEY}`;
 
@@ -174,7 +194,6 @@
             } else { grid.innerHTML = "<p style='grid-column:span 2;text-align:center;'>Belum ada foto.</p>"; }
         });
 
-        // CHAT LOGIC (FIXED)
         async function sendChat() {
             const input = document.getElementById('chatInput');
             const val = input.value.trim();
@@ -242,7 +261,11 @@
             document.getElementById('tabelMapel').innerHTML = "<tr><th>Hari</th><th>Mapel</th></tr>" + listHari.map(h => `<tr><td><b>${h}</b></td><td>${j[h] || '-'}</td></tr>`).join('');
         });
 
-        function logout() { localStorage.clear(); window.location.replace("index.html"); }
+        function logout() { 
+            if(me !== "User") database.ref('log_online/' + me).remove();
+            localStorage.clear(); 
+            window.location.replace("index.html"); 
+        }
     </script>
 </body>
 </html>

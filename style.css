@@ -5,25 +5,6 @@
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
-var Tawk_API = Tawk_API || {};
-Tawk_API.onLoad = function(){
-    // Menyesuaikan posisi widget agar lebih ke atas/dekat input
-    Tawk_API.setAttributes({
-        'visibility' : {
-            'desktop' : {
-                'position' : 'br', // Bottom Right
-                'xOffset' : 20,    // Jarak dari kanan
-                'yOffset' : 90     // Jarak dari bawah (sesuaikan agar pas di atas nav-bottom)
-            },
-            'mobile' : {
-                'position' : 'br',
-                'xOffset' : 10,
-                'yOffset' : 90     // Sesuaikan dengan tinggi nav-bottom Anda
-            }
-        }
-    }, function(error){});
-};
-
 body {
     display: flex;
     justify-content: center;
@@ -79,9 +60,9 @@ body {
     /* PAGAR LAYAR UNTUK HP */
     max-width: 90vw; 
     padding: 40px;
-    background: rgba(255, 255, 255, 0.05);
+    background: rgba(255, 255, 255, 0.09);
     border-radius: 15px;
-    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 15px 35px rgba(250, 0, 120, 1.5);
     backdrop-filter: blur(10px);
     border: 1px solid rgba(255, 255, 255, 0.1);
     text-align: center;
