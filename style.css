@@ -14,6 +14,23 @@ body {
     overflow: hidden;
 }
 
+/* Tambahan CSS khusus Admin Panel agar bisa discroll */
+#adminPanel {
+    display: none; 
+    background: rgba(32, 44, 51, 0.98); 
+    padding: 20px; 
+    padding-bottom: 50px; /* Tambah ruang di bawah biar item terakhir gak nempel */
+    border-radius: 20px; 
+    border: 1px solid #00d2ff;
+    margin-top: 20px;
+    margin-bottom: 20px;
+
+    /* PAGAR SCROLL LEBIH PENDEK */
+    max-height: 55vh; /* Diturunin biar gak tabrakan sama Nav Bottom */
+    overflow-y: auto; 
+    -webkit-overflow-scrolling: touch; /* Halus buat Vivo Y16 */
+}
+
 /* Container untuk efek hujan */
 .background-container {
     position: absolute;
@@ -95,7 +112,7 @@ body {
     width: 100%;
     padding: 10px;
     border: 1px solid #3498db;
-    background: transparent; /* Tambahan agar button tidak default grey */
+    background: transparent;
     color: #3498db;
     font-size: 16px;
     cursor: pointer;
